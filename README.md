@@ -21,6 +21,8 @@ Commands available to date:
  - zpool get all
 
 
+![zyggy](https://github.com/manoeldesouza/zyggy/blob/master/screenshot/zyggy.png)
+
 ## Usage:
 
  sudo ./zyggy
