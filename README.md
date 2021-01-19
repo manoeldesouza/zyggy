@@ -23,6 +23,12 @@ Commands available to date:
 
 ![zyggy](https://github.com/manoeldesouza/zyggy/blob/master/screenshot/zyggy.png)
 
+
+## Dependencies
+
+FreeBSD:
+ - GTK3: pkg install gtk3
+
 ## Usage:
 
  sudo ./zyggy

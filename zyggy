@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import re
 import gi
@@ -26,6 +26,8 @@ class App:
         self.btn_properties = Gtk.Button.new_from_icon_name("gtk-properties", Gtk.IconSize.MENU)
         self.btn_help       = Gtk.Button.new_from_icon_name("gtk-help",       Gtk.IconSize.MENU)
         self.btn_about      = Gtk.Button.new_from_icon_name("gtk-about",      Gtk.IconSize.MENU)
+        self.btn_undo       = Gtk.Button.new_from_icon_name("gtk-undelete",   Gtk.IconSize.MENU)
+        self.btn_menu       = Gtk.MenuButton()
 
         self.cmb_mode       = Gtk.ComboBoxText()
         self.list           = Gtk.ListStore()
@@ -142,6 +144,8 @@ class App:
         box_left.add(self.btn_copy)
         box_left.add(self.btn_delete)
         box_left.add(self.btn_properties)
+        box_left.add(self.btn_menu)
+        box_left.add(self.btn_undo)
 
         box_right.add(self.cmb_mode)
         # box_right.add(self.btn_help)
