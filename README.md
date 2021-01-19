@@ -27,7 +27,8 @@ Commands available to date:
 ## Dependencies
 
 FreeBSD:
- - GTK3: pkg install gtk3
+ - GTK3: pkg install python37 gtk3 py37-gobject3 (and xorg and a window manager of choice)
+
 
 ## Usage:
 

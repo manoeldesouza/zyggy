@@ -144,8 +144,8 @@ class App:
         box_left.add(self.btn_copy)
         box_left.add(self.btn_delete)
         box_left.add(self.btn_properties)
-        box_left.add(self.btn_menu)
-        box_left.add(self.btn_undo)
+        # box_left.add(self.btn_menu)
+        # box_left.add(self.btn_undo)
 
         box_right.add(self.cmb_mode)
         # box_right.add(self.btn_help)
