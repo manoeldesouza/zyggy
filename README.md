@@ -19,3 +19,8 @@ Commands available to date:
  - zpool rename
  - zpool remove
  - zpool get all
+
+
+## Usage:
+
+ sudo ./zyggy
