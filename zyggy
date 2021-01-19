@@ -1,0 +1,578 @@
+#!/usr/bin/python3
+
+import re
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
+from gi.repository import Gdk
+from subprocess import Popen, PIPE
+
+DATASETS  = 0
+SNAPSHOTS = 1
+VOLUMES   = 2
+POOLS     = 3
+
+class App:
+
+    def __init__(self):
+        '''Defines the basic components of the UI'''
+        self.btn_refresh    = Gtk.Button.new_from_icon_name("gtk-refresh",    Gtk.IconSize.MENU)
+        self.btn_new        = Gtk.Button.new_from_icon_name("gtk-new",        Gtk.IconSize.MENU)
+        self.btn_rename     = Gtk.Button.new_from_icon_name("gtk-edit",       Gtk.IconSize.MENU)
+        self.btn_copy       = Gtk.Button.new_from_icon_name("gtk-copy",       Gtk.IconSize.MENU)
+        self.btn_up         = Gtk.Button.new_from_icon_name("gtk-go-up",      Gtk.IconSize.MENU)
+        self.btn_delete     = Gtk.Button.new_from_icon_name("gtk-delete",     Gtk.IconSize.MENU)
+        self.btn_properties = Gtk.Button.new_from_icon_name("gtk-properties", Gtk.IconSize.MENU)
+        self.btn_help       = Gtk.Button.new_from_icon_name("gtk-help",       Gtk.IconSize.MENU)
+        self.btn_about      = Gtk.Button.new_from_icon_name("gtk-about",      Gtk.IconSize.MENU)
+
+        self.cmb_mode       = Gtk.ComboBoxText()
+        self.list           = Gtk.ListStore()
+        self.table          = Gtk.TreeView()
+
+        self.window         = Gtk.Window()
+
+        self.done = False
+
+        self.set_signals()
+        self.draw_ui()
+
+    def set_signals(self):
+        '''Defines responses to the click events at each button'''
+        self.cmb_mode.connect("changed",       self.on_mode_change)
+        self.btn_refresh.connect("clicked",    self.update)
+        self.btn_new.connect("clicked",        self.on_new_click)
+        self.btn_rename.connect("clicked",     self.on_rename_click)
+        self.btn_copy.connect("clicked",       self.on_copy_click)
+        self.btn_up.connect("clicked",         self.on_up_click)
+        self.btn_delete.connect("clicked",     self.on_delete_click)
+        self.btn_properties.connect("clicked", self.on_properties_click)
+        self.btn_help.connect("clicked",       self.on_help_click)
+        self.btn_about.connect("clicked",      self.on_about_click)
+        self.window.connect("key-press-event", self.on_window_keypress)
+
+    def update(self, button):
+        '''Updates list of ZFS (Dataset, Volume and Snapshot) and ZPOOL elements'''
+
+        for column in self.table.get_columns():
+            self.table.remove_column(column)
+
+        cmd = []
+        active = self.cmb_mode.get_active()
+
+        if active == DATASETS:
+            cmd = ["zfs", "list", "-o", "name,used,avail,volsize,mountpoint", "-t", "filesystem"]
+        elif active == SNAPSHOTS:
+            cmd = ["zfs", "list", "-o", "name,used,avail,volsize,mountpoint", "-t", "snapshot"]
+        elif active == VOLUMES:
+            cmd = ["zfs", "list", "-o", "name,used,avail,volsize,mountpoint", "-t", "volume"]
+        elif active == POOLS:
+            cmd = ["zpool", "list", "-o", "name,alloc,free,size,health"]
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        
+        if stderr != b'':
+            self.list.clear()
+            error = stderr.decode('utf-8')
+            print("Error:", error)
+            App.error_dialog(error)
+                        
+        else:
+            result = []
+
+            output = stdout.decode('utf-8')
+            for line in output.splitlines():
+                rows = line.split()
+                result.append(rows)
+
+            n_columns = len(result[0])
+            
+            self.list.clear()
+            if self.done == False:
+                self.list.set_column_types([*([str]*n_columns)])
+                self.done = True
+
+            for row in result[1:]:
+                self.list.append(row)
+
+            self.table.set_model(self.list)
+
+            for i, column_title in enumerate(result[0]):
+                renderer = Gtk.CellRendererText()
+                column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+                column.set_resizable(True)
+                self.table.append_column(column)
+
+    def draw_ui(self):
+        '''Draws the structure of the UI'''
+        self.btn_refresh.set_tooltip_text("Refresh")
+        self.btn_new.set_tooltip_text("New")
+        self.btn_rename.set_tooltip_text("Rename")
+        self.btn_up.set_tooltip_text("Promote")
+        self.btn_copy.set_tooltip_text("Copy")
+        self.btn_delete.set_tooltip_text("Remove")
+        self.btn_properties.set_tooltip_text("Get All")
+        self.btn_help.set_tooltip_text("Help")
+        self.btn_about.set_tooltip_text("About")
+        
+        self.cmb_mode.append_text("Datasets")
+        self.cmb_mode.append_text("Snapshots")
+        self.cmb_mode.append_text("Volumes")
+        self.cmb_mode.append_text("Pools")
+        self.cmb_mode.set_active(DATASETS)
+
+        box_left       = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        box_right      = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        box_contents   = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        frame_contents = Gtk.Frame()
+
+        header = Gtk.HeaderBar()
+
+        scrollable_treelist = Gtk.ScrolledWindow()
+        scrollable_treelist.set_vexpand(True)
+        scrollable_treelist.add(self.table)
+        box_contents.add(scrollable_treelist)
+
+        box_left.add(self.btn_refresh)
+        box_left.add(self.btn_new)
+        box_left.add(self.btn_rename)
+        box_left.add(self.btn_up)
+        box_left.add(self.btn_copy)
+        box_left.add(self.btn_delete)
+        box_left.add(self.btn_properties)
+
+        box_right.add(self.cmb_mode)
+        # box_right.add(self.btn_help)
+        box_right.add(self.btn_about)
+
+        header.set_title("Zyggy")
+        header.set_subtitle("ZFS Administration GUI")
+        header.set_show_close_button(True)
+        header.pack_start(box_left)
+        header.pack_end(box_right)
+
+        self.window.set_titlebar(header)
+        self.window.set_default_size(800, 600)
+        self.window.set_border_width(10)
+        self.window.set_position(Gtk.WindowPosition.CENTER)
+        self.window.connect("destroy", Gtk.main_quit)
+
+        frame_contents.add(box_contents)
+        self.window.add(frame_contents)
+
+        self.window.show_all()
+
+    def on_window_keypress(self, widget, event):
+        key = Gdk.keyval_name(event.keyval)
+        
+        if   key == "F1":  pass
+        elif key == "F2":  self.on_rename_click(self.btn_rename)
+        elif key == "F3":  self.on_new_click(self.btn_new)
+        elif key == "F4":  pass
+        elif key == "F5":  self.on_copy_click(self.btn_copy)
+        elif key == "F6":  pass
+        elif key == "F7":  pass
+        elif key == "F8":  self.on_delete_click(self.btn_delete)
+        elif key == "F9":  pass
+        elif key == "F10": pass
+        elif key == "F11": pass
+        elif key == "F12": pass
+
+    def on_mode_change(self, combo):
+        mode = self.cmb_mode.get_active()
+
+        if mode == DATASETS:
+            self.btn_new.set_sensitive(True)
+            self.btn_new.set_tooltip_text("zfs create")
+
+            self.btn_rename.set_sensitive(True)
+            self.btn_rename.set_tooltip_text("zfs rename")
+
+            self.btn_copy.set_sensitive(True)
+            self.btn_copy.set_tooltip_text("zfs snapshot")
+
+            self.btn_up.set_sensitive(True)
+            self.btn_up.set_tooltip_text("zfs promote")
+
+            self.btn_delete.set_sensitive(True)
+            self.btn_delete.set_tooltip_text("zfs remove")
+
+            self.btn_properties.set_sensitive(True)
+            self.btn_properties.set_tooltip_text("zfs get all")
+
+        elif mode == SNAPSHOTS:
+            self.btn_new.set_sensitive(False)
+            self.btn_new.set_tooltip_text("")
+
+            self.btn_rename.set_sensitive(True)
+            self.btn_rename.set_tooltip_text("zfs rename")
+
+            self.btn_copy.set_sensitive(True)
+            self.btn_copy.set_tooltip_text("zfs clone")
+
+            self.btn_up.set_sensitive(False)
+            self.btn_up.set_tooltip_text("")
+
+            self.btn_delete.set_sensitive(True)
+            self.btn_delete.set_tooltip_text("zfs remove")
+
+            self.btn_properties.set_sensitive(True)
+            self.btn_properties.set_tooltip_text("zfs get all")
+
+        elif mode == VOLUMES:
+            self.btn_new.set_sensitive(True)
+            self.btn_new.set_tooltip_text("zfs create -V")
+
+            self.btn_rename.set_sensitive(True)
+            self.btn_rename.set_tooltip_text("zfs rename")
+
+            self.btn_copy.set_sensitive(True)
+            self.btn_copy.set_tooltip_text("zfs snapshot")
+
+            self.btn_up.set_sensitive(True)
+            self.btn_up.set_tooltip_text("zfs promote")
+
+            self.btn_delete.set_sensitive(True)
+            self.btn_delete.set_tooltip_text("zfs remove")
+
+            self.btn_properties.set_sensitive(True)
+            self.btn_properties.set_tooltip_text("zfs get all")
+
+        elif mode == POOLS:
+            self.btn_new.set_sensitive(False)
+            self.btn_new.set_tooltip_text("")
+
+            self.btn_rename.set_sensitive(True)
+            self.btn_rename.set_tooltip_text("zpool rename")
+
+            self.btn_copy.set_sensitive(False)
+            self.btn_copy.set_tooltip_text("")
+
+            self.btn_up.set_sensitive(False)
+            self.btn_up.set_tooltip_text("")
+
+            self.btn_delete.set_sensitive(True)
+            self.btn_delete.set_tooltip_text("zpool remove")
+
+            self.btn_properties.set_sensitive(True)
+            self.btn_properties.set_tooltip_text("zpool get all")
+
+        self.update(combo)
+
+    def on_new_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+        if target != "": target += "/"
+
+        value = None
+        cmd = []
+        if mode == DATASETS:
+            value = App.input_dialog("Datasets", "Enter new Dataset name", target)
+            if value != None: cmd = ["zfs", "create", value]
+            else: return
+
+        elif mode == VOLUMES:
+            value1, value2 = App.dual_input_dialog("Volumes", "Enter new Volume name and size", target, "10G")
+            if value1 != None and value2 != None: cmd = ["zfs", "create", "-V", value2, value1]
+            else: return
+
+        else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        self.update(button)
+
+    def on_rename_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+
+        value = None
+        cmd = []
+
+        if mode == DATASETS or mode == VOLUMES or mode == SNAPSHOTS:
+            value = App.input_dialog("Datasets", "Enter new name for Dataset {}".format(target), target)
+            if value != None: cmd = ["zfs", "rename", target, value]
+            else: return
+
+        elif mode == POOLS:
+            value = App.input_dialog("Pools", "Enter new name for Pool {}".format(target), target)
+            if value != None: cmd = ["zpool", "rename", target, value]
+            else: return
+
+        else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        self.update(button)
+
+    def on_copy_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+        target_formatted = ""
+
+        value = None
+        cmd = []
+        if mode == DATASETS:
+            if target != "": target_formatted = target + "@"
+            else: return
+
+            value = App.input_dialog("Datasets", "Enter new Snapshot name for Dataset {}".format(target), target_formatted)
+            if value != None: cmd = ["zfs", "snapshot", value]
+            else: return
+
+        elif mode == SNAPSHOTS:
+            if target != "": target_formatted = target
+            else: return
+
+            value = App.input_dialog("Datasets", "Enter new Clone name for Snapshot {}".format(target), target_formatted)
+            if value != None: cmd = ["zfs", "clone", target, value]
+            else: return
+
+        elif mode == VOLUMES:
+            if target != "": target_formatted = target + "@"
+            else: return
+
+            value = App.input_dialog("Datasets", "Enter new Snapshot name for Volume {}".format(target), target_formatted)
+            if value != None: cmd = ["zfs", "snapshot", value]
+            else: return
+       
+        else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        self.update(button)
+
+    def on_up_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+
+        value = None
+        cmd = []
+
+        if mode == DATASETS or mode == VOLUMES or mode == SNAPSHOTS:
+            value = App.confirm_dialog("Datasets", "The following dataset will be promoted. Confirm?", target)
+            if value == True: cmd = ["zfs", "promote", target]
+            else: return
+
+        # elif mode == POOLS:
+        #     value = App.confirm_dialog("Pools", "The following pool will be destroyed. Confirm?", target)
+        #     if value == True: cmd = ["zpool", "destroy", target]
+        #     else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        self.update(button)
+
+    def on_delete_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+
+        value = None
+        cmd = []
+
+        if mode == DATASETS or mode == VOLUMES or mode == SNAPSHOTS:
+            value = App.confirm_dialog("Datasets", "The following dataset will be destroyed. Confirm?", target)
+            if value == True: cmd = ["zfs", "destroy", target]
+            else: return
+
+        elif mode == POOLS:
+            value = App.confirm_dialog("Pools", "The following pool will be destroyed. Confirm?", target)
+            if value == True: cmd = ["zpool", "destroy", target]
+            else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        self.update(button)
+
+    def on_properties_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+        if target == "": return
+
+        cmd = []
+        if mode == DATASETS or mode == VOLUMES or mode == SNAPSHOTS:
+            cmd = ["zfs", "get", "all", target]
+
+        elif mode == POOLS:
+            cmd = ["zpool", "get", "all", target]
+
+        else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        App.list_dialog(stdout)
+
+        self.update(button)
+
+    def on_help_click(self, button):
+        print("on_help_click")
+
+    def on_about_click(self, button):
+        dialog = Gtk.AboutDialog()
+        dialog.set_program_name("Zyggy")
+        dialog.set_icon_name("blockify")
+        dialog.set_version("0.1")
+        dialog.set_authors(["Manoel de Souza <manoel.desouza@outlook.com.br>"])
+        dialog.set_copyright("2021 (c) Manoel de Souza")
+        dialog.set_license("The MIT License (MIT)")
+        dialog.set_comments("ZFS Administration GUI")
+        dialog.set_website_label("Zyggy in GITHUB")
+        dialog.set_website("http://github.com/manoeldesouza/zyggy")
+        
+        dialog.run()
+        dialog.destroy()
+
+    def get_target(self):
+        selection = self.table.get_selection()
+        m, s = selection.get_selected()
+
+        target = ""
+        if s != None: target = m[s][0]
+
+        return target
+
+    def check_error(self, stderr):
+        if stderr != b'':
+            self.list.clear()
+            error = stderr.decode('utf-8')
+            print("Error:", error)
+            App.error_dialog(error)
+
+    @staticmethod
+    def error_dialog(msg):
+        message = Gtk.MessageDialog(
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.CLOSE,
+            text=msg)
+        message.run()
+        message.destroy()
+
+    @staticmethod
+    def confirm_dialog(title, text, value):
+        entry = Gtk.Label()
+        entry.set_text(value)
+        # entry.set_activates_default(True)
+
+        dialog = Gtk.MessageDialog(title=title, buttons=Gtk.ButtonsType.OK_CANCEL, text=text)
+        # dialog.connect("destroy", dialog.destroy)
+        dialog.set_border_width(8)
+        dialog.vbox.pack_start(entry, False, False, 6)
+        dialog.show_all()
+
+        res = dialog.run()
+        value = entry.get_text()
+        dialog.destroy()
+        if res == Gtk.ResponseType.OK:
+            return True
+
+        return False
+
+    @staticmethod
+    def input_dialog(title, text, value):
+        entry = Gtk.Entry()
+        entry.set_text(value)
+        entry.set_activates_default(True)
+
+        dialog = Gtk.MessageDialog(title=title, buttons=Gtk.ButtonsType.OK_CANCEL, text=text)
+        # dialog.connect("destroy", dialog.destroy)
+        dialog.set_border_width(8)
+        dialog.vbox.pack_start(entry, False, False, 6)
+        dialog.show_all()
+
+        res = dialog.run()
+        value = entry.get_text()
+        dialog.destroy()
+        if res == Gtk.ResponseType.OK:
+            return value
+
+        return None
+
+    @staticmethod
+    def dual_input_dialog(title, text, value1, value2):
+        entry1 = Gtk.Entry()
+        entry1.set_text(value1)
+        entry1.set_activates_default(True)
+
+        entry2 = Gtk.Entry()
+        entry2.set_text(value2)
+        entry2.set_activates_default(True)
+
+        dialog = Gtk.MessageDialog(title=title, buttons=Gtk.ButtonsType.OK_CANCEL, text=text)
+
+        dialog.set_border_width(8)
+        dialog.vbox.pack_start(entry1, False, False, 6)
+        dialog.vbox.pack_start(entry2, False, False, 6)
+        dialog.show_all()
+
+        res = dialog.run()
+        value1 = entry1.get_text()
+        value2 = entry2.get_text()
+        dialog.destroy()
+        if res == Gtk.ResponseType.OK:
+            return value1, value2
+
+        return None, None
+
+    @staticmethod
+    def list_dialog(stdout):
+        list_store     = Gtk.ListStore()
+        local_table    = Gtk.TreeView()
+        dialog         = Gtk.Window()
+        box_contents   = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        frame_contents = Gtk.Frame()
+
+        result = []
+
+        output = stdout.decode('utf-8')
+        for line in output.splitlines():
+            rows = re.split(r'\s{2,}', line)
+            result.append(rows)
+
+        n_columns = len(result[0])
+        
+        list_store.clear()
+        list_store.set_column_types([*([str]*n_columns)])
+
+        for row in result[1:]:
+            list_store.append(row)
+
+        local_table.set_model(list_store)
+
+        for i, column_title in enumerate(result[0]):
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+            column.set_resizable(True)
+            local_table.append_column(column)
+
+        scrollable_treelist = Gtk.ScrolledWindow()
+        scrollable_treelist.set_vexpand(True)
+
+        scrollable_treelist.add(local_table)
+        box_contents.add(scrollable_treelist)
+        frame_contents.add(box_contents)
+        dialog.add(frame_contents)
+
+        dialog.set_title("GET ALL")
+        dialog.set_default_size(800, 600)
+        dialog.set_border_width(10)
+        dialog.set_position(Gtk.WindowPosition.CENTER)
+        dialog.show_all()
+
+
+zyggy = App()
+
+Gtk.main()
