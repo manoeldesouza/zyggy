@@ -13,6 +13,13 @@ SNAPSHOTS = 1
 VOLUMES   = 2
 POOLS     = 3
 
+def has_zfs():
+    process = Popen(["which", "zfs"], stdout=PIPE, stderr=PIPE)
+    stdout, _ = process.communicate()
+
+    if stdout == b'': return False
+    return True
+
 class App:
 
     def __init__(self):
@@ -577,6 +584,8 @@ class App:
         dialog.show_all()
 
 
-zyggy = App()
-
-Gtk.main()
+if has_zfs():
+    zyggy = App()
+    Gtk.main()
+else:
+    print("ZFS not found")

@@ -26,8 +26,18 @@ Commands available to date:
 
 ## Dependencies
 
-FreeBSD:
- - GTK3: pkg install python37 gtk3 py37-gobject3 (and xorg and a window manager of choice)
+ - FreeBSD: 
+    - FreeBSD 12 release: pkg install python37 gtk3 py37-gobject3 (and xorg and a window manager of choice)
+    - FreeBSD 13 current: pkg install python37 gtk3 py37-gobject3 (and xorg and a window manager of choice)
+  
+ - Manjaro: 
+   - i3: pacman -s zfs
+
+ - Ubuntu:
+   - Dekstop 20.04: sudo apt install zfsutils-linux
+   - Dekstop 20.10: sudo apt install zfsutils-linux
+   - Server 20.10: sudo apt install zfsutils-linux
+   - Server 20.04: sudo apt install zfsutils-linux
 
 
 ## Usage:
