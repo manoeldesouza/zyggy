@@ -82,7 +82,7 @@ class App:
         process = Popen(cmd, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
         
-        if stderr != b'':
+        if stderr != b'' and stderr != b'no datasets available\n':
             self.list.clear()
             error = stderr.decode('utf-8')
             print("Error:", error)
@@ -96,8 +96,13 @@ class App:
                 rows = line.split()
                 result.append(rows)
 
-            n_columns = len(result[0])
-            
+            columns = ["NAME", "USED", "AVAIL", "VOLSIZE", "MOUNTPOINT"]
+            n_columns = 5
+
+            if len(result) > 0:
+                n_columns = len(result[0])
+                columns = result[0]
+
             self.list.clear()
             if self.done == False:
                 self.list.set_column_types([*([str]*n_columns)])
@@ -108,7 +113,7 @@ class App:
 
             self.table.set_model(self.list)
 
-            for i, column_title in enumerate(result[0]):
+            for i, column_title in enumerate(columns):
                 renderer = Gtk.CellRendererText()
                 column = Gtk.TreeViewColumn(column_title, renderer, text=i)
                 column.set_resizable(True)
