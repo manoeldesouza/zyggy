@@ -55,6 +55,7 @@ class App:
         self.btn_rename.connect("clicked",     self.on_rename_click)
         self.btn_copy.connect("clicked",       self.on_copy_click)
         self.btn_up.connect("clicked",         self.on_up_click)
+        self.btn_undo.connect("clicked",     self.on_undo_click)
         self.btn_delete.connect("clicked",     self.on_delete_click)
         self.btn_properties.connect("clicked", self.on_properties_click)
         self.btn_help.connect("clicked",       self.on_help_click)
@@ -81,43 +82,39 @@ class App:
 
         process = Popen(cmd, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
-        
+
+        self.list.clear()        
         if stderr != b'' and stderr != b'no datasets available\n':
-            self.list.clear()
             error = stderr.decode('utf-8')
             print("Error:", error)
             App.error_dialog(error)
+            return
                         
-        else:
-            result = []
+        result = []
+        output = stdout.decode('utf-8')
+        for line in output.splitlines():
+            rows = line.split()
+            result.append(rows)
 
-            output = stdout.decode('utf-8')
-            for line in output.splitlines():
-                rows = line.split()
-                result.append(rows)
+        columns = ["NAME", "USED", "AVAIL", "VOLSIZE", "MOUNTPOINT"]
+        n_columns = 5
+        if len(result) > 0:
+            n_columns = len(result[0])
+            columns = result[0]
 
-            columns = ["NAME", "USED", "AVAIL", "VOLSIZE", "MOUNTPOINT"]
-            n_columns = 5
+        if self.done == False:
+            self.list.set_column_types([*([str]*n_columns)])
+            self.done = True
 
-            if len(result) > 0:
-                n_columns = len(result[0])
-                columns = result[0]
+        for row in result[1:]:
+            self.list.append(row)
 
-            self.list.clear()
-            if self.done == False:
-                self.list.set_column_types([*([str]*n_columns)])
-                self.done = True
-
-            for row in result[1:]:
-                self.list.append(row)
-
-            self.table.set_model(self.list)
-
-            for i, column_title in enumerate(columns):
-                renderer = Gtk.CellRendererText()
-                column = Gtk.TreeViewColumn(column_title, renderer, text=i)
-                column.set_resizable(True)
-                self.table.append_column(column)
+        self.table.set_model(self.list)
+        for i, column_title in enumerate(columns):
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+            column.set_resizable(True)
+            self.table.append_column(column)
 
     def draw_ui(self):
         '''Draws the structure of the UI'''
@@ -127,6 +124,7 @@ class App:
         self.btn_up.set_tooltip_text("Promote")
         self.btn_copy.set_tooltip_text("Copy")
         self.btn_delete.set_tooltip_text("Remove")
+        self.btn_undo.set_tooltip_text("Rollback")
         self.btn_properties.set_tooltip_text("Get All")
         self.btn_help.set_tooltip_text("Help")
         self.btn_about.set_tooltip_text("About")
@@ -155,9 +153,10 @@ class App:
         box_left.add(self.btn_up)
         box_left.add(self.btn_copy)
         box_left.add(self.btn_delete)
+        box_left.add(self.btn_undo)
         box_left.add(self.btn_properties)
         # box_left.add(self.btn_menu)
-        # box_left.add(self.btn_undo)
+
 
         box_right.add(self.cmb_mode)
         # box_right.add(self.btn_help)
@@ -181,6 +180,7 @@ class App:
         self.window.show_all()
 
     def on_window_keypress(self, widget, event):
+        '''Associates Function keys with Button clicks'''
         key = Gdk.keyval_name(event.keyval)
         
         if   key == "F1":  pass
@@ -189,9 +189,9 @@ class App:
         elif key == "F4":  pass
         elif key == "F5":  self.on_copy_click(self.btn_copy)
         elif key == "F6":  pass
-        elif key == "F7":  pass
+        elif key == "F7":  self.on_undo_click(self.btn_undo)
         elif key == "F8":  self.on_delete_click(self.btn_delete)
-        elif key == "F9":  pass
+        elif key == "F9":  self.on_properties_click(self.btn_properties)
         elif key == "F10": pass
         elif key == "F11": pass
         elif key == "F12": pass
@@ -212,6 +212,9 @@ class App:
             self.btn_up.set_sensitive(True)
             self.btn_up.set_tooltip_text("zfs promote")
 
+            self.btn_undo.set_sensitive(False)
+            self.btn_undo.set_tooltip_text("")
+
             self.btn_delete.set_sensitive(True)
             self.btn_delete.set_tooltip_text("zfs remove")
 
@@ -230,6 +233,9 @@ class App:
 
             self.btn_up.set_sensitive(False)
             self.btn_up.set_tooltip_text("")
+
+            self.btn_undo.set_sensitive(True)
+            self.btn_undo.set_tooltip_text("Rollback")
 
             self.btn_delete.set_sensitive(True)
             self.btn_delete.set_tooltip_text("zfs remove")
@@ -250,6 +256,9 @@ class App:
             self.btn_up.set_sensitive(True)
             self.btn_up.set_tooltip_text("zfs promote")
 
+            self.btn_undo.set_sensitive(False)
+            self.btn_undo.set_tooltip_text("")
+
             self.btn_delete.set_sensitive(True)
             self.btn_delete.set_tooltip_text("zfs remove")
 
@@ -268,6 +277,9 @@ class App:
 
             self.btn_up.set_sensitive(False)
             self.btn_up.set_tooltip_text("")
+
+            self.btn_undo.set_sensitive(False)
+            self.btn_undo.set_tooltip_text("")
 
             self.btn_delete.set_sensitive(True)
             self.btn_delete.set_tooltip_text("zpool remove")
@@ -378,10 +390,7 @@ class App:
             if value == True: cmd = ["zfs", "promote", target]
             else: return
 
-        # elif mode == POOLS:
-        #     value = App.confirm_dialog("Pools", "The following pool will be destroyed. Confirm?", target)
-        #     if value == True: cmd = ["zpool", "destroy", target]
-        #     else: return
+        else: return
 
         process = Popen(cmd, stdout=PIPE, stderr=PIPE)
         _, stderr = process.communicate()
@@ -405,6 +414,28 @@ class App:
             value = App.confirm_dialog("Pools", "The following pool will be destroyed. Confirm?", target)
             if value == True: cmd = ["zpool", "destroy", target]
             else: return
+
+        else: return
+
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        
+        self.check_error(stderr)
+        self.update(button)
+
+    def on_undo_click(self, button):
+        mode = self.cmb_mode.get_active()
+        target = self.get_target()
+
+        value = None
+        cmd = []
+
+        if mode == SNAPSHOTS:
+            value = App.confirm_dialog("Snapshot", "The dataset will be rolled back to the following snapshot. Confirm?", target)
+            if value == True: cmd = ["zfs", "rollback", target]
+            else: return
+
+        else: return
 
         process = Popen(cmd, stdout=PIPE, stderr=PIPE)
         _, stderr = process.communicate()
@@ -441,7 +472,7 @@ class App:
         dialog = Gtk.AboutDialog()
         dialog.set_program_name("Zyggy")
         dialog.set_icon_name("blockify")
-        dialog.set_version("0.1")
+        dialog.set_version("0.2")
         dialog.set_authors(["Manoel de Souza <manoel.desouza@outlook.com.br>"])
         dialog.set_copyright("2021 (c) Manoel de Souza")
         dialog.set_license("The MIT License (MIT)")
@@ -592,5 +623,6 @@ class App:
 if has_zfs():
     zyggy = App()
     Gtk.main()
+
 else:
     print("ZFS not found")

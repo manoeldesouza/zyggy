@@ -2,8 +2,7 @@
 ## ZFS Administration GUI
 
 
-Zyggy is a very simple GUI for basic ZFS administration.
-The system provides graphical access for most frequently 
+Zyggy is a very simple GUI for basic ZFS administration. The system provides graphical access for most frequently 
 used ZFS and ZPOOL commands, as listed below:
 
 Commands available to date:
@@ -13,6 +12,7 @@ Commands available to date:
  - zfs snapshot
  - zfs clone
  - zfs promote
+ - zfs rollback
  - zfs remove
  - zfs get all
  - zpool rename
@@ -23,8 +23,7 @@ Commands available to date:
 ![zyggy](https://github.com/manoeldesouza/zyggy/blob/master/screenshot/zyggy.png)
 
 
-Zyggy is the GTK version of a previous development called 
-ZC (ZFS commander) available in
+Zyggy is the GTK version of a previous ncurses-based development called ZC (ZFS commander) available in
 https://github.com/manoeldesouza/zc
 
 
@@ -41,7 +40,7 @@ https://github.com/manoeldesouza/zc
    - Dekstop 20.04: sudo apt install zfsutils-linux
    - Dekstop 20.10: sudo apt install zfsutils-linux
    - Server 20.10: sudo apt install zfsutils-linux python3.7-minimal libgtk-3-0 libgtk-3-dev libcairo-gobject2
-   - Server 20.04: sudo apt install zfsutils-linux
+   - Server 20.04: sudo apt install zfsutils-linux python3.7-minimal libgtk-3-0 libgtk-3-dev libcairo-gobject2
 
 
 ## Usage:
