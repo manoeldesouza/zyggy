@@ -2,7 +2,7 @@
 Encoding=UTF-8
 Version=1.0
 Type=Application
-# Might also work if wet to False if `sudo` replaced with `gksudo` or `kdesu` or whatever equivalent ships with your DM/WM
+# Might also work if set to False if `sudo` replaced with `gksudo` or `kdesu` or whatever equivalent ships with your DM/WM
 Terminal=True
 Exec=sudo zyggy
 Name=Zyggy
