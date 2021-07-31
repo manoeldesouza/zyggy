@@ -45,4 +45,15 @@ https://github.com/manoeldesouza/zc
 
 ## Usage:
 
- sudo ./zyggy
+Launch from terminal:
+
+```shell
+$ sudo ./zyggy
+```
+
+Add an entry to your application launcher/desktop:
+
+```shell
+$ ln -s /opt/zyggy/zyggy ~/.local/bin/zyggy
+$ cp zyggy.desktop ~/.local/share/applications/zyggy.desktop
+```
